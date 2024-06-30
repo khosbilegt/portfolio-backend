@@ -17,8 +17,9 @@ public class BlogEndpoint {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Response> getBlogs(@QueryParam("title") @DefaultValue("") String title,
+                                  @QueryParam("type") @DefaultValue("") String type,
                                   @QueryParam("tags") @DefaultValue("") String tagString) {
-        return blogService.fetchBlogs(title, tagString)
+        return blogService.fetchBlogs(title, type, tagString)
                 .onItem().transform(Utilities::successResponse);
     }
 

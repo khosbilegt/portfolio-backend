@@ -13,7 +13,6 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
-import org.jooq.Result;
 import org.jooq.SelectConditionStep;
 import org.jooq.exception.IntegrityConstraintViolationException;
 import org.postgresql.util.PSQLException;
@@ -33,10 +32,11 @@ public class BlogService {
     DSLContext context;
     private final ExecutorService QUERY_THREAD = Executors.newSingleThreadExecutor();
 
-    private Uni<List<BlogPostRecord>> queryBlogs(String title, List<String> tags) {
+    private Uni<List<BlogPostRecord>> queryBlogs(String title, String type, List<String> tags) {
         return Uni.createFrom().item(() -> {
                     SelectConditionStep<BlogPostRecord> firstCondition = context.selectFrom(BLOG_POST)
-                            .where(BLOG_POST.BLOG_TITLE.like("%" + title + "%"));
+                            .where(BLOG_POST.BLOG_TITLE.like("%" + title + "%"))
+                            .and(BLOG_POST.TYPE.like("%" + type + "%"));
                     if (tags.isEmpty()) {
                         return firstCondition.fetch();
                     } else {
@@ -48,7 +48,7 @@ public class BlogService {
                 .runSubscriptionOn(QUERY_THREAD);
     }
 
-    public Uni<JsonObject> fetchBlogs(String title, String tagString) {
+    public Uni<JsonObject> fetchBlogs(String title, String type, String tagString) {
         List<String> tags;
         if (tagString.contains(",")) {
             tags = new ArrayList<>(List.of(tagString.split(",")));
@@ -57,7 +57,7 @@ public class BlogService {
         } else {
             tags = new ArrayList<>();
         }
-        return queryBlogs(title, tags)
+        return queryBlogs(title, type.toUpperCase(), tags)
                 .onItem().transform(blogPostRecords -> {
                     JsonArray jsonArray = new JsonArray();
                     for (BlogPostRecord postRecord : blogPostRecords) {
