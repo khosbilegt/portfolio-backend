@@ -14,7 +14,6 @@ public class BlogEndpoint {
     @Inject
     BlogService blogService;
 
-    @Path("/")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Response> getBlogs(@QueryParam("title") @DefaultValue("") String title,
@@ -23,10 +22,15 @@ public class BlogEndpoint {
                 .onItem().transform(Utilities::successResponse);
     }
 
-    @Path("/")
     @POST
     public Uni<Response> createBlog(JsonObject jsonObject) {
         return blogService.createBlogPost(jsonObject)
+                .onItem().transform(unused -> Utilities.successResponse());
+    }
+
+    @PATCH
+    public Uni<Response> updateBlog(JsonObject jsonObject) {
+        return blogService.updateBlogPost(jsonObject)
                 .onItem().transform(unused -> Utilities.successResponse());
     }
 }
