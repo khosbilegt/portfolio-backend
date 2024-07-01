@@ -19,7 +19,7 @@ public class BlogEndpoint {
     public Uni<Response> getBlogs(@QueryParam("title") @DefaultValue("") String title,
                                   @QueryParam("type") @DefaultValue("") String type,
                                   @QueryParam("tags") @DefaultValue("") String tagString) {
-        return blogService.fetchBlogs(title, type, tagString)
+        return blogService.fetchBlogs(title, type, tagString.toLowerCase())
                 .onItem().transform(Utilities::successResponse);
     }
 
@@ -33,5 +33,12 @@ public class BlogEndpoint {
     public Uni<Response> updateBlog(JsonObject jsonObject) {
         return blogService.updateBlogPost(jsonObject)
                 .onItem().transform(unused -> Utilities.successResponse());
+    }
+
+    @GET
+    @Path("/tag")
+    public Uni<Response> getTags() {
+        return blogService.fetchUniqueTags()
+                .onItem().transform(Utilities::successResponse);
     }
 }

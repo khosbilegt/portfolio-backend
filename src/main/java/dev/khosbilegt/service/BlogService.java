@@ -4,25 +4,29 @@ import dev.khosbilegt.exception.KnownException;
 import dev.khosbilegt.jooq.generated.tables.records.BlogPostRecord;
 import dev.khosbilegt.service.dto.BlogPost;
 import dev.khosbilegt.utilities.Utilities;
+import io.quarkus.runtime.StartupEvent;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.unchecked.Unchecked;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import org.jooq.DSLContext;
-import org.jooq.JSONB;
-import org.jooq.SelectConditionStep;
+import org.jooq.*;
 import org.jooq.exception.IntegrityConstraintViolationException;
+import org.jooq.impl.DSL;
 import org.postgresql.util.PSQLException;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static dev.khosbilegt.jooq.generated.Tables.BLOG_POST;
+import static org.jooq.impl.DSL.field;
 
 @SuppressWarnings("BlockingMethodInNonBlockingContext")
 @ApplicationScoped
@@ -31,6 +35,15 @@ public class BlogService {
     @Inject
     DSLContext context;
     private final ExecutorService QUERY_THREAD = Executors.newSingleThreadExecutor();
+    private final Set<String> CACHED_TAGS = new HashSet<>();
+
+    public void init(@Observes StartupEvent ignored) {
+        queryUniqueTags()
+                .onItem().invoke(CACHED_TAGS::addAll)
+                .onItem().invoke(unused -> LOG.infov("Completed caching [Tags]: {0}", CACHED_TAGS.size()))
+                .subscribe().with(unused -> LOG.infov("Completed caching [Blog Service]..."),
+                        throwable -> LOG.errorv(throwable, "Failed to cache [Tags]: {0}", throwable.getMessage()));
+    }
 
     private Uni<List<BlogPostRecord>> queryBlogs(String title, String type, List<String> tags) {
         return Uni.createFrom().item(() -> {
@@ -87,6 +100,7 @@ public class BlogService {
                         context.insertInto(BLOG_POST)
                                 .set(blogPost.toRecord())
                                 .execute();
+                        CACHED_TAGS.addAll(blogPost.getTags());
                     } catch (IntegrityConstraintViolationException e) {
                         if (e.getCause() instanceof PSQLException psqlException) {
                             String constraintName = psqlException.getServerErrorMessage() == null ? "" : psqlException.getServerErrorMessage().getConstraint();
@@ -113,8 +127,10 @@ public class BlogService {
                         List<String> tags = new ArrayList<>();
                         for (Object tag : jsonObject.getJsonArray("tags")) {
                             tags.add(tag.toString());
+                            CACHED_TAGS.add(tags.toString());
                         }
                         tagArray = tags.toArray(new String[0]);
+                        CACHED_TAGS.addAll(tags);
                     } else {
                         tagArray = blogPost.getTags().toArray(new String[0]);
                     }
@@ -131,5 +147,22 @@ public class BlogService {
                             .execute();
                 })
                 .replaceWithVoid();
+    }
+
+    public Uni<List<String>> queryUniqueTags() {
+        return Uni.createFrom().item(() -> context
+                .fetch("SELECT DISTINCT unnest(tags) AS tag FROM blog_post")
+                .into(String.class));
+    }
+
+    public Uni<JsonObject> fetchUniqueTags() {
+        return Uni.createFrom().item(() -> {
+            JsonArray jsonArray = new JsonArray();
+            for (String tag : CACHED_TAGS) {
+                jsonArray.add(tag);
+            }
+            return new JsonObject()
+                    .put("tags", jsonArray);
+        });
     }
 }
