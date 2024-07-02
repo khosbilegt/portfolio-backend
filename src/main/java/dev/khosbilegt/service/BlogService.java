@@ -12,6 +12,7 @@ import io.vertx.core.json.JsonObject;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.NotFoundException;
 import org.jboss.logging.Logger;
 import org.jooq.*;
 import org.jooq.exception.IntegrityConstraintViolationException;
@@ -142,7 +143,7 @@ public class BlogService {
                             .set(BLOG_POST.IS_PUBLIC, jsonObject.containsKey("is_public") ? jsonObject.getBoolean("is_public") : blogPost.isPublic())
                             .set(BLOG_POST.READ_DURATION, jsonObject.containsKey("read_duration") ? jsonObject.getInteger("read_duration") : blogPost.getReadDuration())
                             .set(BLOG_POST.TAGS, tagArray)
-                            .set(BLOG_POST.BODY, jsonObject.containsKey("body") ? JSONB.valueOf(jsonObject.getJsonObject("body").encode()) : JSONB.valueOf(blogPost.getBody().encode()))
+                            .set(BLOG_POST.BODY, jsonObject.containsKey("body") ? JSONB.valueOf(jsonObject.getJsonArray("body").encode()) : JSONB.valueOf(blogPost.getBody().encode()))
                             .where(BLOG_POST.BLOG_ID.eq(blogPost.getId()))
                             .execute();
                 })
@@ -164,5 +165,17 @@ public class BlogService {
             return new JsonObject()
                     .put("tags", jsonArray);
         });
+    }
+
+    public Uni<JsonObject> fetchBlogByTitle(String title) {
+        return Uni.createFrom().item(Unchecked.supplier(() -> {
+            BlogPostRecord record = context.selectFrom(BLOG_POST)
+                    .where(BLOG_POST.BLOG_TITLE.eq(title))
+                    .fetchOne();
+            if (record != null) {
+                return new BlogPost(record).toJson();
+            }
+            throw new NotFoundException("BLOG_NOT_FOUND");
+        }));
     }
 }

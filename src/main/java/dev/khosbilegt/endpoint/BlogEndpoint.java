@@ -23,6 +23,14 @@ public class BlogEndpoint {
                 .onItem().transform(Utilities::successResponse);
     }
 
+    @GET
+    @Path("/{title}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Uni<Response> getBlogByTitle(@PathParam("title") String title) {
+        return blogService.fetchBlogByTitle(title)
+                .onItem().transform(Utilities::successResponse);
+    }
+
     @POST
     public Uni<Response> createBlog(JsonObject jsonObject) {
         return blogService.createBlogPost(jsonObject)

@@ -2,6 +2,7 @@ package dev.khosbilegt.service.dto;
 
 import dev.khosbilegt.jooq.generated.tables.records.BlogPostRecord;
 import dev.khosbilegt.utilities.Utilities;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import org.jooq.JSONB;
 
@@ -21,8 +22,10 @@ public class BlogPost {
     private final boolean isPublic;
     private final LocalDateTime createDate;
     private final int readDuration;
-    private final JsonObject body;
+    private final JsonArray body;
     private final List<String> tags = new ArrayList<>();
+    private Integer upvoteCount = 0;
+    private Integer viewCount = 0;
 
     public BlogPost(JsonObject jsonObject) {
         Utilities.validateMissingParams("Create Blog Post", jsonObject, List.of("title", "blurb", "thumbnail", "type", "body"));
@@ -31,7 +34,7 @@ public class BlogPost {
         this.blurb = jsonObject.getString("blurb");
         this.thumbnail = jsonObject.getString("thumbnail");
         this.type = jsonObject.getString("type");
-        this.body = jsonObject.getJsonObject("body");
+        this.body = jsonObject.getJsonArray("body");
         this.isPublic = jsonObject.containsKey("is_public") ? jsonObject.getBoolean("is_public") : false;
         this.readDuration = 10;
         this.createDate = LocalDateTime.now();
@@ -51,8 +54,14 @@ public class BlogPost {
         this.isPublic = record.get(BLOG_POST.IS_PUBLIC);
         this.readDuration = record.get(BLOG_POST.READ_DURATION);
         this.createDate = record.get(BLOG_POST.CREATE_DATE);
+        this.viewCount = record.getViewCount();
+        this.upvoteCount = record.getUpvoteCount();
         this.tags.addAll(List.of(record.get(BLOG_POST.TAGS)));
-        this.body = new JsonObject(record.getBody().data());
+        JsonArray bodyJsonArray = new JsonArray();
+        try {
+            bodyJsonArray = new JsonArray(record.getBody().data());
+        } catch (Exception e) {}
+        this.body = bodyJsonArray;
     }
 
     public String getId() {
@@ -87,7 +96,7 @@ public class BlogPost {
         return readDuration;
     }
 
-    public JsonObject getBody() {
+    public JsonArray getBody() {
         return body;
     }
 
@@ -119,6 +128,9 @@ public class BlogPost {
                 .put("thumbnail", thumbnail)
                 .put("is_public", isPublic)
                 .put("create_date", createDate)
+                .put("read_duration", readDuration)
+                .put("upvote_count", upvoteCount)
+                .put("view_count", viewCount)
                 .put("type", type)
                 .put("tags", tags)
                 .put("body", body);
