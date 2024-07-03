@@ -14,9 +14,10 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.NotFoundException;
 import org.jboss.logging.Logger;
-import org.jooq.*;
+import org.jooq.DSLContext;
+import org.jooq.JSONB;
+import org.jooq.SelectConditionStep;
 import org.jooq.exception.IntegrityConstraintViolationException;
-import org.jooq.impl.DSL;
 import org.postgresql.util.PSQLException;
 
 import java.util.ArrayList;
@@ -27,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static dev.khosbilegt.jooq.generated.Tables.BLOG_POST;
-import static org.jooq.impl.DSL.field;
 
 @SuppressWarnings("BlockingMethodInNonBlockingContext")
 @ApplicationScoped
@@ -55,7 +55,7 @@ public class BlogService {
                         return firstCondition.fetch();
                     } else {
                         return context
-                                .fetch("SELECT * FROM blog_post WHERE blog_title LIKE ? AND tags @> ARRAY[?]::varchar[]", "%" + title + "%", tags.toArray(new String[0]))
+                                .fetch("SELECT * FROM blog_post WHERE blog_title LIKE ? AND tags @> ARRAY[?]::varchar[] ORDER BY create_date DESC", "%" + title + "%", tags.toArray(new String[0]))
                                 .into(BlogPostRecord.class);
                     }
                 })
@@ -128,7 +128,6 @@ public class BlogService {
                         List<String> tags = new ArrayList<>();
                         for (Object tag : jsonObject.getJsonArray("tags")) {
                             tags.add(tag.toString());
-                            CACHED_TAGS.add(tags.toString());
                         }
                         tagArray = tags.toArray(new String[0]);
                         CACHED_TAGS.addAll(tags);
