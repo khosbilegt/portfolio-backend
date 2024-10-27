@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<configuration>
+    <jdbc>
+        <driver>org.postgresql.Driver</driver>
+        <url>jdbc:postgresql://127.0.0.1:5432/portfolio</url>
+        <user>portfolio</user>
+        <password>portfolio</password>
+    </jdbc>
+    <generator>
+        <database>
+            <name>org.jooq.meta.postgres.PostgresDatabase</name>
+            <inputSchema>public</inputSchema>
+            <includes>.*</includes>
+        </database>
+        <target>
+            <packageName>mn.khosbilegt.jooq.generated</packageName>
+            <directory>./target/generated-sources/</directory>
+        </target>
+    </generator>
+</configuration>
