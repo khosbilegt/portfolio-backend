@@ -2,6 +2,8 @@ package mn.khosbilegt.service;
 
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.unchecked.Unchecked;
+import io.vertx.core.json.JsonObject;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
@@ -31,32 +33,62 @@ public class BlogService {
     public void init(@Observes StartupEvent ignored) {
         Uni.createFrom().voidItem()
                 .emitOn(QUERY_THREAD)
-                .chain(this::cacheStoredBlogs)
                 .chain(this::cacheStoredTags)
+                .chain(this::cacheStoredBlogs)
                 .chain(this::cacheStoredExperiences)
                 .subscribe().with(unused -> LOG.infov("Completed initializing [BlogService]..."));
     }
 
-    private Uni<Void> cacheStoredBlogs() {
-        return Uni.createFrom().voidItem();
-    }
-
     private Uni<Void> cacheStoredTags() {
-        return Uni.createFrom().voidItem();
-    }
-
-    private Uni<Void> cacheStoredExperiences() {
-        return Uni.createFrom().voidItem();
-    }
-
-    private Uni<Void> fetchBlogs() {
         return Uni.createFrom().voidItem()
                 .emitOn(QUERY_THREAD)
-                .invoke(unused -> {
+                .invoke(Unchecked.consumer(unused -> {
+                    context.selectFrom(PF_TAG)
+                            .fetch()
+                            .forEach(record -> {
+                                Tag tag = new Tag(record.getTagId(), record.getTagName(), record.getTagType(), record.getTagColor());
+                                CACHED_TAGS.put(tag.getId(), tag);
+                            });
+                }));
+    }
+
+    private Uni<Void> cacheStoredBlogs() {
+        return Uni.createFrom().voidItem()
+                .emitOn(QUERY_THREAD)
+                .invoke(Unchecked.consumer(unused -> {
                     context.selectFrom(PF_BLOG)
                             .fetch()
                             .forEach(record -> {
+                                Blog blog = new Blog(
+                                        record.getBlogId(),
+                                        record.getBlogTitle(),
+                                        record.getBlogSubtitle(),
+                                        record.getBlogThumbnail(),
+                                        record.getCreateDate(),
+                                        record.getModifiedDate(),
+                                        new JsonObject(record.getBlogContent().data())
+                                );
+                                CACHED_BLOGS.put(blog.getId(), blog);
+                                context.selectFrom(PF_BLOG_TAGS)
+                                        .where(PF_BLOG_TAGS.BLOG_ID.eq(blog.getId()))
+                                        .fetch()
+                                        .forEach(tagRecord -> {
+                                            Tag tag = CACHED_TAGS.get(tagRecord.getTagId());
+                                            if (tag != null) {
+                                                blog.addTag(tag);
+                                            }
+                                        });
                             });
-                });
+                }));
+    }
+
+    private Uni<Void> cacheStoredExperiences() {
+        return Uni.createFrom().voidItem()
+                .emitOn(QUERY_THREAD)
+                .invoke(Unchecked.consumer(unused -> {
+                    context.selectFrom(PF_EXPERIENCE)
+                            .fetch()
+                            .forEach(record -> {});
+                }));
     }
 }
