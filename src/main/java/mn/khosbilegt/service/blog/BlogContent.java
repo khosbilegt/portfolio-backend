@@ -18,4 +18,8 @@ public class BlogContent {
     public List<BlogContentBlock> getBlocks() {
         return blocks;
     }
+
+    public JsonObject toJson() {
+        return new JsonObject();
+    }
 }
