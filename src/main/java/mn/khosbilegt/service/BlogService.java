@@ -8,17 +8,14 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.NotFoundException;
-import mn.khosbilegt.service.dto.Blog;
-import mn.khosbilegt.service.dto.Experience;
-import mn.khosbilegt.service.dto.Tag;
+import mn.khosbilegt.service.blog.dto.Blog;
+import mn.khosbilegt.service.blog.dto.Experience;
+import mn.khosbilegt.service.blog.dto.Tag;
 import org.jboss.logging.Logger;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -56,17 +53,20 @@ public class BlogService {
                 }));
     }
 
-    public Uni<List<Tag>> searchTags(String id) {
+    public Uni<List<Tag>> searchTags(String id, String name, String type) {
         return Uni.createFrom().voidItem()
                 .emitOn(QUERY_THREAD)
                 .map(Unchecked.function(unused -> {
-                    if (id.isEmpty()) {
+                    if (id.isEmpty() && type.isEmpty() && name.isEmpty()) {
                         return new ArrayList<>(CACHED_TAGS.values());
-                    } else if (CACHED_TAGS.containsKey(id)) {
-                        return List.of(CACHED_TAGS.get(id));
-                    } else {
-                        throw new NotFoundException("Tag not found: " + id);
                     }
+                    List<Tag> tags = new ArrayList<>();
+                    CACHED_TAGS.values().forEach(tag -> {
+                        if (tag.getId().contains(id) && tag.getName().toLowerCase().contains(name.toLowerCase()) && tag.getType().toLowerCase().contains(type.toLowerCase())) {
+                            tags.add(tag);
+                        }
+                    });
+                    return tags;
                 }));
     }
 
@@ -84,18 +84,19 @@ public class BlogService {
                 }));
     }
 
-    public Uni<Void> updateTag(Tag tag) {
+    public Uni<Void> updateTag(String id, Tag tag) {
         return Uni.createFrom().voidItem()
                 .emitOn(QUERY_THREAD)
                 .invoke(Unchecked.consumer(unused -> {
-                    if (CACHED_TAGS.containsKey(tag.getId())) {
+                    if (CACHED_TAGS.containsKey(id)) {
+                        tag.setId(id);
                         context.update(PF_TAG)
                                 .set(PF_TAG.TAG_NAME, tag.getName())
                                 .set(PF_TAG.TAG_TYPE, tag.getType())
                                 .set(PF_TAG.TAG_COLOR, tag.getColor())
                                 .where(PF_TAG.TAG_ID.eq(tag.getId()))
                                 .execute();
-                        CACHED_TAGS.put(tag.getId(), tag);
+                        CACHED_TAGS.put(id, tag);
                     } else {
                         throw new NotFoundException("Tag not found: " + tag.getId());
                     }
@@ -168,6 +169,29 @@ public class BlogService {
                 });
     }
 
+    public Uni<Void> createBlog(Blog blog) {
+        return Uni.createFrom().voidItem()
+                .emitOn(QUERY_THREAD)
+                .invoke(Unchecked.consumer(unused -> {
+                    context.insertInto(PF_BLOG)
+                            .set(PF_BLOG.BLOG_ID, blog.getId())
+                            .set(PF_BLOG.BLOG_TITLE, blog.getTitle())
+                            .set(PF_BLOG.BLOG_SUBTITLE, blog.getSubtitle())
+                            .set(PF_BLOG.BLOG_THUMBNAIL, blog.getThumbnail())
+                            .set(PF_BLOG.CREATE_DATE, blog.getCreateDate())
+                            .set(PF_BLOG.MODIFIED_DATE, blog.getModifiedDate())
+                            .set(PF_BLOG.BLOG_CONTENT, JSONB.jsonb(blog.getContent().toJson().encode()))
+                            .execute();
+                    blog.getTags().forEach(tag -> {
+                        context.insertInto(PF_BLOG_TAGS)
+                                .set(PF_BLOG_TAGS.BLOG_ID, blog.getId())
+                                .set(PF_BLOG_TAGS.TAG_ID, tag.getId())
+                                .execute();
+                    });
+                    CACHED_BLOGS.put(blog.getId(), blog);
+                }));
+    }
+
     public Uni<Void> updateBlog(Blog blog) {
         return Uni.createFrom().voidItem()
                 .emitOn(QUERY_THREAD)
@@ -222,7 +246,8 @@ public class BlogService {
                 .invoke(Unchecked.consumer(unused -> {
                     context.selectFrom(PF_EXPERIENCE)
                             .fetch()
-                            .forEach(record -> {});
+                            .forEach(record -> {
+                            });
                 }));
     }
 }

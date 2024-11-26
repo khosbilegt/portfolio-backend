@@ -1,4 +1,4 @@
-package mn.khosbilegt.service.dto;
+package mn.khosbilegt.service.blog.dto;
 
 import io.vertx.core.json.JsonObject;
 import mn.khosbilegt.service.blog.BlogContent;

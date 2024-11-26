@@ -1,4 +1,4 @@
-package mn.khosbilegt.service.dto;
+package mn.khosbilegt.service.blog.dto;
 
 import java.util.UUID;
 
